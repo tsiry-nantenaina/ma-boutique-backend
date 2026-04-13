@@ -8,13 +8,12 @@ dotenv.config();
 const app = express();
 
 // --- CONFIGURATION CRUCIALE ---
-// app.use(cors()) permet à ton navigateur d'accepter les réponses de Render
 app.use(cors()); 
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Route de test (celle qui affiche "Cannot GET /" si on ne met rien)
+// Route de test
 app.get('/', (req, res) => {
     res.send('Serveur Inviolable en ligne !');
 });
@@ -22,13 +21,20 @@ app.get('/', (req, res) => {
 // 1. ROUTE POUR ENVOYER LE CODE DE VALIDATION
 app.post('/send-code', async (req, res) => {
     const { email } = req.body;
-    const verificationCode = Math.floor(100000 + Math.random() * 900000); // Code à 6 chiffres
+    const verificationCode = Math.floor(100000 + Math.random() * 900000); 
 
+    // MODIFICATION ICI : Configuration robuste pour éviter ENETUNREACH sur Render
     let transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // Utilise SSL
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
+        },
+        tls: {
+            // Cette option aide à prévenir les erreurs de connexion réseau sur certains hébergeurs
+            rejectUnauthorized: false
         }
     });
 
@@ -41,9 +47,11 @@ app.post('/send-code', async (req, res) => {
 
     try {
         await transporter.sendMail(mailOptions);
+        console.log("Email envoyé avec succès à:", email);
         res.status(200).json({ success: true, code: verificationCode });
     } catch (error) {
-        console.error("Erreur d'envoi d'email:", error);
+        // On affiche l'erreur complète dans les logs Render pour surveiller
+        console.error("Erreur d'envoi d'email détaillée:", error);
         res.status(500).json({ success: false, message: "Erreur lors de l'envoi du mail" });
     }
 });
@@ -52,11 +60,9 @@ app.post('/send-code', async (req, res) => {
 app.post('/save-order', async (req, res) => {
     const { email, nom, panier, total } = req.body;
     
-    // Ici, tu peux ajouter la logique pour enregistrer dans Excel ou envoyer un autre mail
     console.log("Nouvelle commande reçue de:", nom);
 
     try {
-        // Simulation d'enregistrement réussi
         res.status(200).json({ success: true, message: "Commande enregistrée" });
     } catch (error) {
         res.status(500).json({ success: false, message: "Erreur sauvegarde" });
