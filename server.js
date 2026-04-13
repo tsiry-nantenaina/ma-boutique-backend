@@ -7,34 +7,31 @@ dotenv.config();
 
 const app = express();
 
-// --- CONFIGURATION CRUCIALE ---
 app.use(cors()); 
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Route de test
 app.get('/', (req, res) => {
     res.send('Serveur Inviolable en ligne !');
 });
 
-// 1. ROUTE POUR ENVOYER LE CODE DE VALIDATION
 app.post('/send-code', async (req, res) => {
     const { email } = req.body;
     const verificationCode = Math.floor(100000 + Math.random() * 900000); 
 
-    // MODIFICATION ICI : Configuration robuste pour éviter ENETUNREACH sur Render
+    // FORCE IPv4 : On utilise l'IP directe du serveur SMTP de Google
     let transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
+        host: '74.125.133.108', // Adresse IPv4 directe de Google
         port: 465,
-        secure: true, // Utilise SSL
+        secure: true,
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
         },
         tls: {
-            // Cette option aide à prévenir les erreurs de connexion réseau sur certains hébergeurs
-            rejectUnauthorized: false
+            rejectUnauthorized: false,
+            servername: 'smtp.gmail.com' // Indispensable pour que Google accepte la connexion sur son IP
         }
     });
 
@@ -47,26 +44,18 @@ app.post('/send-code', async (req, res) => {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log("Email envoyé avec succès à:", email);
+        console.log("SUCCÈS : Email envoyé à", email);
         res.status(200).json({ success: true, code: verificationCode });
     } catch (error) {
-        // On affiche l'erreur complète dans les logs Render pour surveiller
-        console.error("Erreur d'envoi d'email détaillée:", error);
-        res.status(500).json({ success: false, message: "Erreur lors de l'envoi du mail" });
+        console.error("ERREUR RÉSEAU DÉTECTÉE :", error.message);
+        res.status(500).json({ success: false, message: "Erreur lors de l'envoi" });
     }
 });
 
-// 2. ROUTE POUR SAUVEGARDER LA COMMANDE
 app.post('/save-order', async (req, res) => {
     const { email, nom, panier, total } = req.body;
-    
-    console.log("Nouvelle commande reçue de:", nom);
-
-    try {
-        res.status(200).json({ success: true, message: "Commande enregistrée" });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Erreur sauvegarde" });
-    }
+    console.log("Commande reçue:", nom);
+    res.status(200).json({ success: true });
 });
 
 app.listen(PORT, () => {
